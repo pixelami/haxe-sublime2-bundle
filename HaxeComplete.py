@@ -484,7 +484,7 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		view.add_regions("haxe-error" , regions , "invalid" , "dot" )
 		
 
-	def on_post_save( self, view ):
+	def on_pre_save( self, view ):
 
 		self.auto_insert_package( view )
 		
