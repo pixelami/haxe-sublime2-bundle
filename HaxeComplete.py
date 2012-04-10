@@ -482,6 +482,48 @@ class HaxeComplete( sublime_plugin.EventListener ):
 				view.set_status("haxe-status" , "Error: " + e["message"] )
 				
 		view.add_regions("haxe-error" , regions , "invalid" , "dot" )
+		
+
+	def on_post_save( self, view ):
+
+		self.auto_insert_package( view )
+		
+						
+	def auto_insert_package( self, view):
+
+		""" 
+		inserts package at top line of a .hx file 
+		if no package declaration exists
+		"""
+
+		fn = view.file_name()
+		if os.path.splitext(fn)[1] != ".hx":
+			return
+		
+		if self.currentBuild is None:
+			return
+			
+		src = view.substr(sublime.Region(0, view.size()))
+		pls = packageLine.findall(src)
+
+		if len(pls) != 0:
+			return 
+		
+		relpath = ""
+		relpathsSegments = []
+
+		dirname = os.path.dirname(fn)
+		for cp in self.currentBuild.classpaths:
+			if os.path.commonprefix([cp,dirname]) == cp :
+				relpath = os.path.relpath(dirname,cp)
+				break
+				
+		package = ".".join(relpath.split(os.sep))
+		#print("package %s;" % package)
+		e = view.begin_edit()
+		view.insert(e,0,"package %s;\n\n" % package)
+		view.end_edit(e)
+
 
 	def on_load( self, view ) :
 		scopes = view.scope_name(view.sel()[0].end()).split()
@@ -864,7 +906,7 @@ class HaxeComplete( sublime_plugin.EventListener ):
 			cleanedParamsText = re.sub(paramDefault,"",paramsText)
 			paramsList = cleanedParamsText.split(",")
 			for param in paramsList:
-				a = param.strip();
+				a = param.lstrip();
 				if a.startswith("?"):
 					a = a[1:]
 				
@@ -875,9 +917,9 @@ class HaxeComplete( sublime_plugin.EventListener ):
 				idx = a.find("=")
 				if idx > -1:
 					a = a[0:idx]
-					
+
 				a = a.strip()
-				comps.append((a + "[arg]", a))
+				comps.append((a + "[param]", a))
 
 		for c in cl :
 			spl = c.split(".")
