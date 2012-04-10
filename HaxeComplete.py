@@ -2,8 +2,10 @@
 import sys
 sys.path.append("/usr/lib/python2.6/")
 sys.path.append("/usr/lib/python2.6/lib-dynload")
+#sys.path.append("hxutil")
 
 import sublime, sublime_plugin
+import hxutil.resolver
 import subprocess
 import tempfile
 import os
@@ -252,7 +254,7 @@ class HaxeGenerateImport( sublime_plugin.TextCommand ):
 			self.start = end - self.size
 
 		self.cname = view.substr(sublime.Region(self.start, end)).rpartition(".")
-		#print(self.cname)
+		print(self.cname)
 		while not self.cname[0] == "" and self.is_membername(self.cname[2]):
 			self.size -= 1 + len(self.cname[2])
 			self.cname = self.cname[0].rpartition(".")
@@ -380,6 +382,7 @@ class HaxeComplete( sublime_plugin.EventListener ):
 	selectingBuild = False
 	builds = []
 	errors = []
+	resolver = None
 
 	currentCompletion = {
 		"inp" : None,
@@ -396,6 +399,7 @@ class HaxeComplete( sublime_plugin.EventListener ):
 
 	def __init__(self):
 		HaxeComplete.inst = self
+		self.resolver = hxutil.resolver.TypeDeclarationResolver()
 
 		out, err = runcmd( ["haxe", "-main", "Nothing", "-js", "nothing.js", "-v", "--no-output"] )
 		#print(out)
@@ -422,6 +426,7 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		hasClasses = False
 
 		for fullpath in glob.glob( os.path.join(path,"*.hx") ) : 
+			print fullpath
 			f = os.path.basename(fullpath)
 			cl, ext = os.path.splitext( f )
 								
@@ -429,8 +434,8 @@ class HaxeComplete( sublime_plugin.EventListener ):
 				
 				s = open( os.path.join( path , f ) , "r" )
 				src = s.read() #comments.sub( s.read() , "" )
-				
-				clPack = "";
+				s.close()
+				clPack = ""
 				for ps in packageLine.findall( src ) :
 					clPack = ps
 				
@@ -860,10 +865,24 @@ class HaxeComplete( sublime_plugin.EventListener ):
 			if t[1] not in cl:
 				cl.append( t[1] )
 
-		packageClasses, subPacks = self.extract_types( src_dir )
-		for c in packageClasses :
-			if c not in cl:
-				cl.append( c )
+		
+		classInfos = []
+		#print classInfos
+		for cp in self.currentBuild.classpaths:
+			cpdecls = self.resolver.getTypeDeclarationsInClassPath(cp)
+			if len(cpdecls) > 0:
+				classInfos.extend(cpdecls)
+
+		for pkg, cls in classInfos:
+			
+			pkg, cls = info
+			clsname = "%s.%s" % (pkg,cls[1])
+			print "class: %s" % clsname
+			
+			if clsname not in cl:
+				cl.append( clsname )
+		
+		
 
 		imports = importLine.findall( src )
 		for i in imports :
@@ -1323,4 +1342,49 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		f.write( src )
 		return f
 
+"""	
+class TypeDeclarationCache():
 	
+	definitions = {}
+
+	def put_def(self, definition):
+		definitions.append(definition)
+
+	def get_all(self):
+		return definitions
+
+class TypeDeclarationResolver():
+
+	typeDeclarations = []
+
+	def get_types_defs_in_classpaths(self,classpaths):
+
+		for cp in classpaths:
+			print "cp: %s" % cp
+			for path, dirs, files in os.walk(cp):
+				for filename in files:
+					print "filename: %s" % filename
+					if os.path.splitext(filename)[1] == ".hx":
+						filepath = os.path.join(path,filename)
+						print "filepath: %s" % filepath
+						types = self.get_types_in_file(filepath)
+						self.typeDeclarations.extend(types)
+		
+		return self.typeDeclarations
+
+	def get_types_in_file(self,filepath):
+
+		fh = open(filepath, "r")
+		src = fh.read()
+		fh.close()
+		declarations = typeDecl.findall(src)
+		print "declarations: %s " % declarations
+		types = []
+		if len(declarations) > 0:
+			for decl in declarations:
+
+				types.append(decl[1])
+		print types
+		return types
+
+"""
