@@ -17,6 +17,7 @@ import hashlib
 import shutil
 from xml.etree import ElementTree
 from subprocess import Popen, PIPE
+import __builtin__
 
 try:
     STARTUP_INFO = subprocess.STARTUPINFO()
@@ -56,11 +57,50 @@ functions = re.compile("function\s+([^;\.\(\)\s]*)", re.I)
 functionParams = re.compile("function\s+[a-zA-Z0-9_]+\s*\(([^\)]*)", re.M)
 paramDefault = re.compile("(=\s*\"*[^\"]*\")", re.M)
 
+"""
+class RollbackImporter:
+	def __init__(self):
+		"Creates an instance and installs as the global importer"
+		self.previousModules = sys.modules.copy()
+		self.realImport = __builtin__.__import__
+		__builtin__.__import__ = self._import
+		self.newModules = {}
+ 
+	def _import(self, name, globals=None, locals=None, fromlist=[]):
+		result = apply(self.realImport, (name, globals, locals, fromlist))
+		self.newModules[name] = 1
+		return result
+        
+	def uninstall(self):
+		for modname in self.newModules.keys():
+			if not self.previousModules.has_key(modname):
+				# Force reload when modname next imported
+				del(sys.modules[modname])
+		__builtin__.__import__ = self.realImport
+"""
+
+modsToReload = []
+for mod in sys.modules:
+	if mod.startswith("hxutil") and sys.modules[mod] != None:
+		modsToReload.append(mod)
+
+modLoadOrder = [
+	"hxutil.os",
+	"hxutil.re",
+	"hxutil.resolver",
+]
+
+for mod in modLoadOrder:
+    if mod in modsToReload:
+    	print "reloading now %s" % mod
+        reload(sys.modules[mod])
+
+
 class HaxeLib :
 
 	available = {}
 	basePath = None
-
+	
 	def __init__( self , name , dev , version ):
  		self.name = name
  		self.dev = dev
@@ -316,7 +356,7 @@ class HaxeGenerateImport( sublime_plugin.TextCommand ):
 class HaxeDisplayCompletion( sublime_plugin.TextCommand ):
 	
 	def run( self , edit ) :
-		#print("completing")
+		print("completing")
 		view = self.view
 		s = view.settings();
 		
@@ -326,12 +366,27 @@ class HaxeDisplayCompletion( sublime_plugin.TextCommand ):
             "next_completion_if_showing" : False
 		} )
 
-		
+
+class CreateHaxeFileCommand(sublime_plugin.WindowCommand):
+    def run(self, dirs):
+        print "CreateHaxeFileCommand"
+        """
+        if len(dirs) == 1:
+        	fn = dirs[0] + "/MyHaxeClass.hx"
+        	fh = open(fn,"w")
+        	fh.write("my new haxe file")
+        	fh.close()
+        	v = self.window.open_file(fn)
+        	v.settings().set('default_dir', dirs[0])
+        """
+    def is_visible(self, dirs):
+        return len(dirs) == 1
+
 
 class HaxeInsertCompletion( sublime_plugin.TextCommand ):
 	
 	def run( self , edit ) :
-		#print("insert completion")
+		print("insert completion")
 		view = self.view
 
 		view.run_command( "insert_best_completion" , {
@@ -376,6 +431,7 @@ class HaxeHint( sublime_plugin.TextCommand ):
 
 class HaxeComplete( sublime_plugin.EventListener ):
 
+	
 	#folder = ""
 	#buildArgs = []
 	currentBuild = None
@@ -398,6 +454,8 @@ class HaxeComplete( sublime_plugin.EventListener ):
 	panel = None
 
 	def __init__(self):
+		
+
 		HaxeComplete.inst = self
 		self.resolver = hxutil.resolver.TypeDeclarationResolver()
 
@@ -419,6 +477,8 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		#for pack in HaxeComplete.stdPackages :
 		#	HaxeComplete.stdCompletes.append( ( pack , pack ))
 
+	
+
 
 	def extract_types( self , path , depth = 0 ) :
 		classes = []
@@ -426,7 +486,7 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		hasClasses = False
 
 		for fullpath in glob.glob( os.path.join(path,"*.hx") ) : 
-			print fullpath
+			#print fullpath
 			f = os.path.basename(fullpath)
 			cl, ext = os.path.splitext( f )
 								
@@ -538,8 +598,16 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		
 		self.generate_build(view)
 		self.highlight_errors( view )
+
+	
+
 	
 	def on_activated( self , view ) :
+		# DEV MODE ONLY
+		#self.reload_modules()
+
+
+
 		scopes = view.scope_name(view.sel()[0].end()).split()
 		#sublime.status_message( scopes[0] )
 		if 'source.haxe.2' not in scopes and 'source.hxml' not in scopes:
@@ -873,14 +941,13 @@ class HaxeComplete( sublime_plugin.EventListener ):
 			if len(cpdecls) > 0:
 				classInfos.extend(cpdecls)
 
-		for pkg, cls in classInfos:
+		for pkg, defType, tName, tParam in classInfos:
+
+			fqClassName = "%s.%s" % (pkg,tName)
+			print "class: %s" % fqClassName
 			
-			pkg, cls = info
-			clsname = "%s.%s" % (pkg,cls[1])
-			print "class: %s" % clsname
-			
-			if clsname not in cl:
-				cl.append( clsname )
+			if fqClassName not in cl:
+				cl.append( fqClassName )
 		
 		
 

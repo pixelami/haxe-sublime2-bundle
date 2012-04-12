@@ -1,0 +1,5 @@
+[
+	
+	{ "caption": "New hx File", "command": "create_haxe_file", "args": {"dirs": []} }
+	
+]
