@@ -57,27 +57,7 @@ functions = re.compile("function\s+([^;\.\(\)\s]*)", re.I)
 functionParams = re.compile("function\s+[a-zA-Z0-9_]+\s*\(([^\)]*)", re.M)
 paramDefault = re.compile("(=\s*\"*[^\"]*\")", re.M)
 
-"""
-class RollbackImporter:
-	def __init__(self):
-		"Creates an instance and installs as the global importer"
-		self.previousModules = sys.modules.copy()
-		self.realImport = __builtin__.__import__
-		__builtin__.__import__ = self._import
-		self.newModules = {}
- 
-	def _import(self, name, globals=None, locals=None, fromlist=[]):
-		result = apply(self.realImport, (name, globals, locals, fromlist))
-		self.newModules[name] = 1
-		return result
-        
-	def uninstall(self):
-		for modname in self.newModules.keys():
-			if not self.previousModules.has_key(modname):
-				# Force reload when modname next imported
-				del(sys.modules[modname])
-		__builtin__.__import__ = self.realImport
-"""
+
 
 modsToReload = []
 for mod in sys.modules:
@@ -368,19 +348,43 @@ class HaxeDisplayCompletion( sublime_plugin.TextCommand ):
 
 
 class CreateHaxeFileCommand(sublime_plugin.WindowCommand):
-    def run(self, dirs):
-        print "CreateHaxeFileCommand"
-        """
-        if len(dirs) == 1:
-        	fn = dirs[0] + "/MyHaxeClass.hx"
-        	fh = open(fn,"w")
-        	fh.write("my new haxe file")
-        	fh.close()
-        	v = self.window.open_file(fn)
-        	v.settings().set('default_dir', dirs[0])
-        """
-    def is_visible(self, dirs):
-        return len(dirs) == 1
+    
+	dir = "" 
+
+	def run(self, dirs):
+		print "CreateHaxeFileCommand"
+		print dirs
+		if len(dirs) == 1:
+			self.dir = dirs[0]
+			self.window.show_input_panel("", "", self.on_done, None, None)
+
+	def is_visible(self, dirs):
+		return len(dirs) == 1
+
+	def on_done(self,filename):
+		
+		if filename.endswith("hx"):
+			className = os.path.splitext(filename)[0]
+		else:
+			className = filename
+			filename = filename + ".hx"
+		
+		newfile = self.dir + "/" + filename
+		print newfile
+		if not os.path.exists(newfile):
+			fh = open(newfile,"w")
+			package = HaxeComplete.inst.get_package_string(self.dir)	
+			fh.write("package "+ package +";\n\nclass "+className + "\n{\n}\n")
+			fh.close()
+			v = self.window.open_file(newfile)
+			v.settings().set('default_dir', self.dir)
+
+   	def on_change(self,input):
+   		pass
+
+   	def on_cancel():
+   		pass
+
 
 
 class HaxeInsertCompletion( sublime_plugin.TextCommand ):
@@ -552,6 +556,14 @@ class HaxeComplete( sublime_plugin.EventListener ):
 	def on_pre_save( self, view ):
 
 		self.auto_insert_package( view )
+
+	def get_package_string(self, dirpath):
+		for cp in self.currentBuild.classpaths:
+			if os.path.commonprefix([cp,dirpath]) == cp :
+				relpath = os.path.relpath(dirpath, cp)
+				break
+		package = ".".join(relpath.split(os.sep))
+		return package
 		
 						
 	def auto_insert_package( self, view):

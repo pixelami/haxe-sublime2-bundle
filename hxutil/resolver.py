@@ -6,16 +6,18 @@ import re
 #compactProp = re.compile(":.*\.([a-z_0-9]+)", re.I)
 #spaceChars = re.compile("\s")
 #wordChars = re.compile("[a-z0-9._]", re.I)
-importLinePattern = re.compile("^([ \t]*)import\s+([a-z0-9._]+);", re.I | re.M)
-packageLinePattern = re.compile("package\s*([a-z0-9\.]*);", re.I)
+
 #libLine = re.compile("([^:]*):[^\[]*\[(dev\:)?(.*)\]")
-classpathLinePattern = re.compile("Classpath : (.*)")
-typeDeclarationPattern = re.compile("(class|typedef|enum)\s+([A-Z][a-zA-Z0-9_]*)(<[a-zA-Z0-9_,]+>)?" , re.M )
 #libFlag = re.compile("-lib\s+(.*?)")
 #skippable = re.compile("^[a-zA-Z0-9_\s]*$")
 #inAnonymous = re.compile("[{,]\s*([a-zA-Z0-9_\"\']+)\s*:\s*$" , re.M | re.U )
 #comments = re.compile( "/\*(.*)\*/" , re.M )
 #extractTag = re.compile("<([a-z0-9_-]+).*\s(name|main)=\"([a-z0-9_./-]+)\"", re.I)
+
+importLinePattern = re.compile("^([ \t]*)import\s+([a-z0-9._]+);", re.I | re.M)
+packageLinePattern = re.compile("package\s*([a-z0-9\.]*);", re.I)
+classpathLinePattern = re.compile("Classpath : (.*)")
+typeDeclarationPattern = re.compile("(class|typedef|enum)\s+([A-Z][a-zA-Z0-9_]*)(<[a-zA-Z0-9_,]+>)?" , re.M )
 variablePattern = re.compile("var\s+([^:;\s]*)", re.I)
 functionPattern = re.compile("function\s+([^;\.\(\)\s]*)", re.I)
 functionParamPattern = re.compile("function\s+[a-zA-Z0-9_]+\s*\(([^\)]*)", re.M)
@@ -109,6 +111,7 @@ class TypeDeclarationResolver():
 		"""
 
 		if not self.fileHasBeenModified(filepath):
+			print("using cache")
 			return self.cache.get(filepath)
 
 		src = self.getSourceFromFile(filepath)
@@ -118,19 +121,6 @@ class TypeDeclarationResolver():
 		info._package = self.getPackageFromSource(src)
 		
 		info._types = typeDeclarationPattern.findall(src)
-		"""
-		declarations = []
-
-		for decl in types:
-			#print decl
-
-			declarations.append( (package , decl) )
-
-		# cache the result
-		self.cache.put(filepath, declarations)
-		
-		return declarations
-		"""
 
 		self.cache.put(filepath, info)
 		return info
