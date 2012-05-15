@@ -17,7 +17,7 @@ import hashlib
 import shutil
 from xml.etree import ElementTree
 from subprocess import Popen, PIPE
-import __builtin__
+#
 
 try:
     STARTUP_INFO = subprocess.STARTUPINFO()
@@ -461,7 +461,7 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		
 
 		HaxeComplete.inst = self
-		self.resolver = hxutil.resolver.TypeDeclarationResolver()
+		self.resolver = hxutil.resolver.resolver;
 
 		out, err = runcmd( ["haxe", "-main", "Nothing", "-js", "nothing.js", "-v", "--no-output"] )
 		#print(out)
@@ -595,11 +595,14 @@ class HaxeComplete( sublime_plugin.EventListener ):
 				relpath = os.path.relpath(dirname,cp)
 				break
 				
-		package = ".".join(relpath.split(os.sep))
-		#print("package %s;" % package)
-		e = view.begin_edit()
-		view.insert(e,0,"package %s;\n\n" % package)
-		view.end_edit(e)
+		packageSegments = relpath.split(os.sep)
+		if len(packageSegments) > 0:
+			package = ".".join(packageSegments)
+			#print("package %s;" % package)
+		
+			e = view.begin_edit()
+			view.insert(e,0,"package %s;\n\n" % package)
+			view.end_edit(e)
 
 
 	def on_load( self, view ) :
@@ -709,7 +712,9 @@ class HaxeComplete( sublime_plugin.EventListener ):
 						currentBuild.libs.append( HaxeLib.get( name ) )
 						currentBuild.args.append( ("-lib" , name) )
 					elif (tag == "classpath"):
-						currentBuild.classpaths.append( os.path.join( buildPath , name ) )
+						classpath = os.path.join( buildPath , name )
+						print "appending classpath: %s" % classpath
+						currentBuild.classpaths.append( classpath )
 						currentBuild.args.append( ("-cp" , os.path.join( buildPath , name ) ) )
 				else: # NME 3.2
 					mPath = re.search("\\bpath=\"([a-z0-9_-]+)\"", l, re.I)
@@ -729,8 +734,15 @@ class HaxeComplete( sublime_plugin.EventListener ):
 				self.builds.append( currentBuild )
 
 
+
 	def find_hxml( self, folder ) :
-		hxmls = glob.glob( os.path.join( folder , "*.hxml" ) )
+		hxmls = []
+		for path, dirs, files in os.walk(folder):
+			for filename in files:
+				if os.path.splitext(filename)[1] == ".hxml":
+					hxmls.append(os.path.join( path , filename ))
+		print "found hxmls:"
+		print hxmls
 
 		for build in hxmls:
 
@@ -824,10 +836,12 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		folder = os.path.dirname(fn)
 		
 		folders = view.window().folders()
+		print folders
 		for f in folders:
 			if f in fn :
-				folder = f
 
+				folder = f
+		print "selected folder %s" % folder
 		# settings.set("haxe-complete-folder", folder)
 		self.find_hxml(folder)
 		self.find_nmml(folder)
@@ -865,8 +879,8 @@ class HaxeComplete( sublime_plugin.EventListener ):
 
 
 	def set_current_build( self , view , id , forcePanel ) :
-		#print("setting current build #"+str(id))
-		#print( self.builds )
+		print("setting current build #"+str(id))
+		print( self.builds )
 		if id < 0 or id >= len(self.builds) :
 			id = 0
 		
@@ -947,15 +961,19 @@ class HaxeComplete( sublime_plugin.EventListener ):
 
 		
 		classInfos = []
-		#print classInfos
+		print "classpaths"
+		print self.currentBuild.classpaths
 		for cp in self.currentBuild.classpaths:
 			cpdecls = self.resolver.getTypeDeclarationsInClassPath(cp)
+			print cpdecls
+			print 
 			if len(cpdecls) > 0:
 				classInfos.extend(cpdecls)
 
-		for pkg, defType, tName, tParam in classInfos:
+		for info in classInfos:
 
-			fqClassName = "%s.%s" % (pkg,tName)
+			
+			fqClassName = "%s.%s" % (info.getSourceInfo().getPackage(),info.getName())
 			print "class: %s" % fqClassName
 			
 			if fqClassName not in cl:
@@ -1049,7 +1067,7 @@ class HaxeComplete( sublime_plugin.EventListener ):
 
 
 
-	def get_build( self , view ) :
+	def get_build( self , view ):
 		
 		if self.currentBuild is None:
 			fn = view.file_name()
@@ -1111,7 +1129,7 @@ class HaxeComplete( sublime_plugin.EventListener ):
 
 		build = self.get_build( view )
 		settings = view.settings()
-
+		print "run haxe"
 		autocomplete = display is not None
 
 		if autocomplete is False and build.nmml is not None:
@@ -1145,7 +1163,7 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		for a in args :
 			cmd.extend( list(a) )
 		
-		#print(cmd)
+		print(cmd)
 		res, err = runcmd( cmd, "" )
 		
 		if not autocomplete :
@@ -1389,7 +1407,6 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		
 		#print(ret)
 		#print(status)
-		#print(status)
 		
 		view.set_status( "haxe-status", status )
 
@@ -1421,49 +1438,3 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		f.write( src )
 		return f
 
-"""	
-class TypeDeclarationCache():
-	
-	definitions = {}
-
-	def put_def(self, definition):
-		definitions.append(definition)
-
-	def get_all(self):
-		return definitions
-
-class TypeDeclarationResolver():
-
-	typeDeclarations = []
-
-	def get_types_defs_in_classpaths(self,classpaths):
-
-		for cp in classpaths:
-			print "cp: %s" % cp
-			for path, dirs, files in os.walk(cp):
-				for filename in files:
-					print "filename: %s" % filename
-					if os.path.splitext(filename)[1] == ".hx":
-						filepath = os.path.join(path,filename)
-						print "filepath: %s" % filepath
-						types = self.get_types_in_file(filepath)
-						self.typeDeclarations.extend(types)
-		
-		return self.typeDeclarations
-
-	def get_types_in_file(self,filepath):
-
-		fh = open(filepath, "r")
-		src = fh.read()
-		fh.close()
-		declarations = typeDecl.findall(src)
-		print "declarations: %s " % declarations
-		types = []
-		if len(declarations) > 0:
-			for decl in declarations:
-
-				types.append(decl[1])
-		print types
-		return types
-
-"""
