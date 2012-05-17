@@ -402,8 +402,9 @@ class HaxeLibResolver:
 	def readInstalledLibs(self):
 		HaxeLib.scan()
 		for a in HaxeLib.available:
-			print a
-			print HaxeLib.available[a].extract_types()
+			//print a
+			//print HaxeLib.available[a].extract_types()
+			pass
 
 
 

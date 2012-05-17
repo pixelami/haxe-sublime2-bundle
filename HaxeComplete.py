@@ -836,7 +836,7 @@ class HaxeComplete( sublime_plugin.EventListener ):
 		folder = os.path.dirname(fn)
 		
 		folders = view.window().folders()
-		print folders
+		#print folders
 		for f in folders:
 			if f in fn :
 
